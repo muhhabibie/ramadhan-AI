@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ramadhan Interactive App</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app-wrapper">
+        <div id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <button class="btn-new-chat" onclick="startNewChat()">+ Chat Baru</button>
+            </div>
+            <div class="history-list" id="history-list"></div>
+            <div class="sidebar-footer">
+                <span>Credit: Muhammad Habibi</span>
+            </div>
+        </aside>
+
+       <main id="chat-container">
+            <header id="chat-header">
+                <div class="header-info">
+                    <button id="menu-btn" class="icon-btn" onclick="toggleSidebar()">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                    </button>
+                    <div class="header-titles">
+                        <h2>RAMADHAN AI</h2>
+                        <div class="location-status">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            <span id="current-city">Malang</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="prayer-dashboard">
+                    <div class="prayer-box">
+                        <div class="p-label">Imsak</div>
+                        <div class="p-time" id="imsak-time">--:--</div>
+                    </div>
+                    <div class="prayer-box">
+                        <div class="p-label">Subuh</div>
+                        <div class="p-time" id="subuh-time">--:--</div>
+                    </div>
+                    <div class="prayer-box">
+                        <div class="p-label">Dzuhur</div>
+                        <div class="p-time" id="dzuhur-time">--:--</div>
+                    </div>
+                    <div class="prayer-box">
+                        <div class="p-label">Ashar</div>
+                        <div class="p-time" id="ashar-time">--:--</div>
+                    </div>
+                    <div class="prayer-box">
+                        <div class="p-label">Maghrib</div>
+                        <div class="p-time" id="maghrib-time">--:--</div>
+                    </div>
+                    <div class="prayer-box">
+                        <div class="p-label">Isya</div>
+                        <div class="p-time" id="isya-time">--:--</div>
+                    </div>
+                </div>
+            </header>
+
+            <div id="welcome-screen">
+                <div class="welcome-content">
+                    <div class="bot-logo">🌙</div>
+                    <h1>Halo, ana Ramadhan AI</h1>
+                    <p>Ada yang bisa ana bantu seputar ibadah Antum hari ini?</p>
+                    <div class="quick-grid">
+                        <button class="q-card" onclick="quickChat('Jadwal sholat Malang')">
+                            <span class="q-icon">🕌</span>
+                            <div class="q-text"><strong>Jadwal Sholat</strong><small>Cek waktu sholat hari ini</small></div>
+                        </button>
+                        <button class="q-card" onclick="quickChat('Tips kuat puasa')">
+                            <span class="q-icon">💡</span>
+                            <div class="q-text"><strong>Tips Puasa</strong><small>Biar antum tetap semangat</small></div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="chat-history" style="display: none;"></div>
+
+            <div class="input-wrapper">
+                <div id="input-area">
+                    <input type="text" id="user-input" placeholder="Tanyakan sesuatu..." onkeypress="handleKeyPress(event)">
+                    <button id="send-btn" onclick="sendMessage()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="js/chatbot.js"></script>
+</body>
+</html>

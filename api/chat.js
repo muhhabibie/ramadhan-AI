@@ -12,20 +12,35 @@ module.exports = async (req, res) => {
     const { message, history = [] } = req.body;
     const tanggal = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
-   const systemInstruction = `Kamu adalah "RAMADHAN AI", asisten virtual pakar agama Islam yang cerdas dan gaul. Hari ini: ${tanggal}.
+    // =====================================================
+    // 🔍 LOG PENGECEKAN API KEY (Hapus/Komentari jika sudah OK)
+    // =====================================================
+    const checkKey = process.env.GEMINI_API_KEY || "";
+    console.log("--- [DEBUG] STATUS KONEKSI API ---");
+    if (!checkKey) {
+        console.log("❌ HASIL: API_KEY TIDAK TERDETEKSI DI ENV VERCEL");
+    } else {
+        console.log(`✅ HASIL: TERDETEKSI (${checkKey.substring(0, 4)}...${checkKey.slice(-4)})`);
+        console.log(`✅ TOTAL KARAKTER: ${checkKey.length}`);
+    }
+    console.log("-----------------------------------");
+    // =====================================================
+
+    const systemInstruction = `Kamu adalah "RAMADHAN AI", asisten virtual pakar agama Islam yang cerdas dan gaul. Hari ini: ${tanggal}.
     Gaya bahasa: Gunakan "Ana" (saya) dan "Antum" (kamu). Santai, bersahabat, namun tetap berwibawa.
 
     === PERATURAN KHUSUS (PENTING!) ===
     1. Jika Antum ditanya hal di luar konteks agama Islam (politik, bola, artis, coding, dll), jawab dengan kalimat: 
        "Ente kadang-kadang ente... Ana ini asisten virtual khusus persoalan agama, bukan pengamat [sebutkan topik yang ditanyakan]. Tanya seputar ibadah aja barakallahu fiik."
     2. Tetap interaktif dan jangan terlalu kaku. Jika pertanyaan relevan, berikan penjelasan yang mendalam.
-    3. Jika pertanyaan menyangkut Al-Qur'an, sertakan teks Arab dan terjemahan jika memungkinkan. Gunakan tag [QURAN:Surah:Ayat] untuk menandai referensi Al-Qur'an.
+    3. Jika pertanyaan menyangkut Al-Qur'an, sertakan teks Arab dan terjemahan jika memungkinkan. Gunakan tag [QURAN:Surah:Ayat] untuk menandai referensi Al-QURAN.
+
     === ATURAN FORMATTING AL-QURAN ===
     1. Tag [QURAN:Surah:Ayat] HARUS MENEMPEL DI BARIS YANG SAMA dengan Teks Arab!
     2. Contoh: (Teks Arab) [QURAN:1:1]`;
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // GANTI: Model sharus valid (2.5-flash sangat stabil saat ini)
+    const genAI = new GoogleGenerativeAI(checkKey);
+    // GANTI: Model harus valid (gemini-2.0-flash sangat stabil saat ini)
     const MODELS = ['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.0-flash'];
 
     for (const modelName of MODELS) {
@@ -46,9 +61,14 @@ module.exports = async (req, res) => {
             return res.status(200).json({ status: "success", reply: response.text() });
 
         } catch (error) {
-            console.error(`Error pada model ${modelName}:`, error);
-            if (error.status === 429) continue; // Coba model berikutnya jika limit
-            return res.status(500).json({ status: "error", reply: "Afwan, sistem sedang lelah. Detail: " + error.message });
+            console.error(`Error pada model ${modelName}:`, error.message);
+            // Jika error karena quota (429), lanjut ke model berikutnya
+            if (error.status === 429 || error.message.includes("429")) continue; 
+            
+            return res.status(500).json({ 
+                status: "error", 
+                reply: "Afwan, sistem sedang lelah. Detail: " + error.message 
+            });
         }
     }
     res.status(200).json({ status: "error", reply: "Afwan Akhi, limit harian habis. Coba lagi nanti." });

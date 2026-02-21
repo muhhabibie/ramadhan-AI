@@ -21,8 +21,8 @@ module.exports = async (req, res) => {
     3. Jika itu Hadits/Doa, jangan beri tag QURAN agar sistem menggunakan suara AI biasa.`;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // GANTI: Model harus valid (2.0-flash sangat stabil saat ini)
-    const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    // GANTI: Model harus valid (2.5-flash sangat stabil saat ini)
+    const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 
     for (const modelName of MODELS) {
         try {

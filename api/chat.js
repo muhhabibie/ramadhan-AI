@@ -1,7 +1,6 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 module.exports = async (req, res) => {
-    // CORS configuration
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -12,34 +11,26 @@ module.exports = async (req, res) => {
     const { message, history = [] } = req.body;
     const tanggal = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // System Instruction dari kode Python Antum
-    const systemInstruction = `Kamu adalah "RAMADHAN AI", asisten virtual dan pakar agama Islam yang cerdas. Hari ini: ${tanggal}.
-    Gaya bahasa: Gunakan "Ana" (saya) dan "Antum" (kamu). Santai, bersahabat, namun tetap berwibawa.
-
-    === KEMAMPUAN UTAMA ===
-    1. JAWABAN MENDALAM: Berikan penjelasan komprehensif (hikmah, maqashid syariah).
-    2. SUMBER VALID: Quran, Hadits, Ijma, Qiyas. Sertakan Teks Arab, Latin, dan Arti.
-
-    === BATASAN KETAT ===
-    1. TOLAK semua pertanyaan non-Islam (politik, coding, matematika, dll) dengan santun.
+    const systemInstruction = `Kamu adalah "RAMADHAN AI", pakar agama Islam cerdas. Hari ini: ${tanggal}.
+    Gaya bahasa: Gunakan "Ana" (saya) dan "Antum" (kamu). Santai tapi berwibawa.
 
     === ATURAN FORMATTING AL-QURAN (WAJIB!) ===
-    1. Tag [QURAN:Surah:Ayat] HARUS MENEMPEL DI BARIS YANG SAMA dengan Teks Arab!
-    2. DILARANG menaruh tag di bawah teks Latin/Arti atau menggunakan bintang (*) pada Latin.`;
+    1. Setiap ayat Al-Quran WAJIB disertai tag [QURAN:Surah:Ayat] tepat setelah teks Arab.
+    2. Contoh: (Teks Arab) [QURAN:1:1]
+    3. Jika itu Hadits/Doa, jangan beri tag QURAN agar sistem menggunakan suara AI biasa.`;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
+    // GANTI: Gunakan model yang valid
+    const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
 
     for (const modelName of MODELS) {
         try {
-            const model = genAI.getGenerativeModel({
+            const model = genAI.getGenerativeModel({ 
                 model: modelName,
-                systemInstruction: systemInstruction
+                systemInstruction: systemInstruction 
             });
 
-            // Trim history (max 10 pesan) seperti di Python
             const trimmedHistory = history.length > 10 ? history.slice(-10) : history;
-
             const chat = model.startChat({
                 history: trimmedHistory,
                 generationConfig: { maxOutputTokens: 2000 }
@@ -47,29 +38,13 @@ module.exports = async (req, res) => {
 
             const result = await chat.sendMessage(message);
             const response = await result.response;
-            let resText = response.text();
+            return res.status(200).json({ status: "success", reply: response.text() });
 
-            // Deteksi Kota untuk Dashboard
-            let cityFound = null;
-            if (resText.includes("CITY_DETECTED:")) {
-                const parts = resText.split("|");
-                cityFound = parts[0].replace("CITY_DETECTED:", "").trim();
-                resText = parts[1] || resText;
-            }
-
-            return res.status(200).json({ status: "success", reply: resText, detected_city: cityFound });
         } catch (error) {
             console.error(`Error pada model ${modelName}:`, error);
-            // Jika error karena quota (429), lanjut ke model berikutnya
-            if (error.message.includes("429") || error.status === 429) continue;
-
-            // Kirim pesan error yang lebih informatif ke frontend untuk debugging
-            return res.status(500).json({
-                status: "error",
-                reply: "Afwan, ada kendala teknis pada mesin AI. Detail: " + (error.message || "Unknown Error")
-            });
+            if (error.status === 429) continue;
+            return res.status(500).json({ status: "error", reply: "Terjadi kesalahan: " + error.message });
         }
     }
-
-    res.status(200).json({ status: "error", reply: "Afwan Akhi, limit harian habis. Coba lagi nanti." });
+    res.status(200).json({ status: "error", reply: "Limit harian habis, Akhi." });
 };

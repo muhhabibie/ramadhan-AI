@@ -28,7 +28,7 @@ module.exports = async (req, res) => {
     2. DILARANG menaruh tag di bawah teks Latin/Arti atau menggunakan bintang (*) pada Latin.`;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'];
 
     for (const modelName of MODELS) {
         try {

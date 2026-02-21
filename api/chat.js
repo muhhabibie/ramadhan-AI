@@ -28,13 +28,13 @@ module.exports = async (req, res) => {
     2. DILARANG menaruh tag di bawah teks Latin/Arti atau menggunakan bintang (*) pada Latin.`;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    const MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-flash'];
 
     for (const modelName of MODELS) {
         try {
-            const model = genAI.getGenerativeModel({ 
+            const model = genAI.getGenerativeModel({
                 model: modelName,
-                systemInstruction: systemInstruction 
+                systemInstruction: systemInstruction
             });
 
             // Trim history (max 10 pesan) seperti di Python
@@ -58,11 +58,16 @@ module.exports = async (req, res) => {
             }
 
             return res.status(200).json({ status: "success", reply: resText, detected_city: cityFound });
-
         } catch (error) {
             console.error(`Error pada model ${modelName}:`, error);
-            if (error.message.includes("429")) continue;
-            return res.status(500).json({ status: "error", reply: "Terjadi kesalahan sistem." });
+            // Jika error karena quota (429), lanjut ke model berikutnya
+            if (error.message.includes("429") || error.status === 429) continue;
+
+            // Kirim pesan error yang lebih informatif ke frontend untuk debugging
+            return res.status(500).json({
+                status: "error",
+                reply: "Afwan, ada kendala teknis pada mesin AI. Detail: " + (error.message || "Unknown Error")
+            });
         }
     }
 

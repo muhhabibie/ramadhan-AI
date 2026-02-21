@@ -2,6 +2,6 @@
   "name": "ramadhan-ai-serverless",
   "version": "1.0.0",
   "dependencies": {
-    "@google/generative-ai": "^0.2.1"
+    "@google/generative-ai": "^0.21.0"
   }
 }

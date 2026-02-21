@@ -33,7 +33,7 @@ module.exports = async (req, res) => {
 
     // Menggunakan kunci yang di-hardcode
     const genAI = new GoogleGenerativeAI(hardcodedKey);
-    const MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash'];
+    const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
 
     for (const modelName of MODELS) {
         try {

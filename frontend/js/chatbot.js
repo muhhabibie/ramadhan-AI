@@ -1,6 +1,6 @@
 /**
  * @fileoverview Frontend logic untuk Ramadhan AI.
- * Perbaikan: Suara AI akan selalu muncul menggunakan default sistem jika suara Arab tidak tersedia.
+ * Fitur: Efek mengetik, Pembeda audio Quran vs Hadits, & Geolocation.
  */
 
 // ==========================================
@@ -27,17 +27,21 @@ function formatMarkdown(text) {
     
     html = html.replace(arabicRegex, function(match, arabicText, surah, ayah) {
         if (surah && ayah) {
+            // JIKA AL-QURAN: Tombol Murottal Asli
             return `
             <div class="arabic-container">
                 <div class="arabic-text" dir="rtl">${arabicText}</div>
-                <button class="play-audio-btn" onclick="playRealQuranAudio(${surah}, ${ayah}, this)">▶ Putar Murottal</button>
+                <button class="play-audio-btn" onclick="playRealQuranAudio(${surah}, ${ayah}, this)">▶ Putar Murottal Asli</button>
+                <small class="audio-notice">✨ Suara asli Qari tersedia untuk ayat Al-Quran</small>
             </div>`;
         } else {
+            // JIKA DOA/HADITS: Gunakan AI Voice
             const encodedText = encodeURIComponent(arabicText);
             return `
             <div class="arabic-container">
                 <div class="arabic-text" dir="rtl">${arabicText}</div>
                 <button class="play-audio-btn" onclick="playArabicAudio(decodeURIComponent('${encodedText}'))">▶ Putar Suara (AI)</button>
+                <small class="audio-notice">ℹ️ Suara Qari asli hanya tersedia untuk Al-Quran. Hadits/Doa menggunakan AI.</small>
             </div>`;
         }
     });
@@ -46,43 +50,41 @@ function formatMarkdown(text) {
 }
 
 /**
- * Suara AI (TTS) - VERSI FIX: Suara pasti muncul
+ * Efek Mengetik (Typing Effect)
  */
-function playArabicAudio(text) {
-    if (!('speechSynthesis' in window)) {
-        alert("Browser Antum tidak mendukung suara AI.");
-        return;
-    }
-
-    // Batalkan suara/murottal yang sedang jalan
-    window.speechSynthesis.cancel();
-    if (quranAudioPlayer) quranAudioPlayer.pause();
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    
-    // Ambil daftar suara yang tersedia di perangkat
-    const voices = window.speechSynthesis.getVoices();
-    
-    // Coba cari suara Arab dulu
-    const arabicVoice = voices.find(v => v.lang.toLowerCase().includes('ar'));
-
-    if (arabicVoice) {
-        utterance.voice = arabicVoice;
-        utterance.lang = arabicVoice.lang;
-    } else {
-        // JIKA ARAB TIDAK ADA, JANGAN PAKSA ar-SA (agar suara default muncul)
-        console.warn("Suara Arab tidak ditemukan. Menggunakan suara default sistem.");
-        // Browser akan otomatis pakai bahasa default (Indo/English)
-    }
-
-    utterance.rate = 0.85; // Sedikit pelan agar jelas
-    utterance.pitch = 1;
-    
-    window.speechSynthesis.speak(utterance);
+function typeMessage(element, text) {
+    return new Promise((resolve) => {
+        let i = 0; 
+        let html = formatMarkdown(text);
+        let isTag = false;
+        element.innerHTML = "";
+        
+        function type() {
+            if (i < html.length) {
+                let char = html.charAt(i);
+                if (char === '<') isTag = true;
+                if (char === '>') { isTag = false; i++; type(); return; }
+                
+                if (isTag) { 
+                    i++; type(); 
+                } else {
+                    element.innerHTML = html.substring(0, i + 1);
+                    i++;
+                    setTimeout(type, 15); // Kecepatan mengetik
+                }
+                const chatHistory = document.getElementById("chat-history");
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            } else {
+                element.innerHTML = html;
+                resolve();
+            }
+        }
+        type();
+    });
 }
 
 /**
- * Pemutar Murottal asli (Mishary Rashid)
+ * Pemutar Murottal Asli
  */
 async function playRealQuranAudio(surah, ayah, btnElement) {
     if (quranAudioPlayer) { quranAudioPlayer.pause(); quranAudioPlayer.currentTime = 0; }
@@ -98,13 +100,25 @@ async function playRealQuranAudio(surah, ayah, btnElement) {
         if(json.code === 200) {
             quranAudioPlayer = new Audio(json.data.audio);
             quranAudioPlayer.play();
-            btnElement.innerHTML = "🔊 Mengaji...";
+            btnElement.innerHTML = "🔊 Sedang Mengaji...";
             quranAudioPlayer.onended = () => btnElement.innerHTML = originalText;
         }
     } catch (e) { 
         btnElement.innerHTML = originalText;
         alert("Gagal memutar murottal.");
     }
+}
+
+/**
+ * Suara AI (TTS)
+ */
+function playArabicAudio(text) {
+    window.speechSynthesis.cancel();
+    if (quranAudioPlayer) quranAudioPlayer.pause();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ar-SA';
+    utterance.rate = 0.85; // Dipelankan sedikit agar jelas
+    window.speechSynthesis.speak(utterance);
 }
 
 // ==========================================
@@ -245,13 +259,14 @@ async function fetchBotResponse(message) {
         });
         const data = await response.json();
         if (data.status === "success") {
-            msgDiv.innerHTML = formatMarkdown(data.reply);
+            // AKTIFKAN KEMBALI EFEK MENGETIK
+            await typeMessage(msgDiv, data.reply);
             saveMessageToSession("bot", data.reply);
         } else {
             msgDiv.innerHTML = data.reply;
         }
     } catch (e) {
-        msgDiv.innerHTML = "Gagal memuat jawaban.";
+        msgDiv.innerHTML = "Waduh, gagal memuat jawaban.";
     }
 }
 

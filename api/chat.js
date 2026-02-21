@@ -25,7 +25,7 @@ module.exports = async (req, res) => {
     2. Contoh: (Teks Arab) [QURAN:1:1]`;
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // GANTI: Model harus valid (2.5-flash sangat stabil saat ini)
+    // GANTI: Model sharus valid (2.5-flash sangat stabil saat ini)
     const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 
     for (const modelName of MODELS) {

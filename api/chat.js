@@ -12,11 +12,19 @@ module.exports = async (req, res) => {
     const { message, history = [] } = req.body;
     const tanggal = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    // === HARDCODED API KEY UNTUK DEBUGGING ===
-    // Kunci diambil langsung dari image_9658a6.png
-    const hardcodedKey = "AIzaSyAlcNDMcKKJN9qHTZzpzer-W2WGVTKLKtw"; 
-    console.log(`[DEBUG] Menggunakan Hardcoded Key: ${hardcodedKey.substring(0, 4)}...${hardcodedKey.slice(-4)}`);
-    // =========================================
+    // =====================================================
+    // 🔍 LOG PENGECEKAN API KEY (Hapus/Komentari jika sudah OK)
+    // =====================================================
+    const checkKey = process.env.GEMINI_API_KEY || "";
+    console.log("--- [DEBUG] STATUS KONEKSI API ---");
+    if (!checkKey) {
+        console.log("❌ HASIL: API_KEY TIDAK TERDETEKSI DI ENV VERCEL");
+    } else {
+        console.log(`✅ HASIL: TERDETEKSI (${checkKey.substring(0, 4)}...${checkKey.slice(-4)})`);
+        console.log(`✅ TOTAL KARAKTER: ${checkKey.length}`);
+    }
+    console.log("-----------------------------------");
+    // =====================================================
 
     const systemInstruction = `Kamu adalah "RAMADHAN AI", asisten virtual pakar agama Islam yang cerdas dan gaul. Hari ini: ${tanggal}.
     Gaya bahasa: Gunakan "Ana" (saya) dan "Antum" (kamu). Santai, bersahabat, namun tetap berwibawa.
@@ -25,15 +33,15 @@ module.exports = async (req, res) => {
     1. Jika Antum ditanya hal di luar konteks agama Islam (politik, bola, artis, coding, dll), jawab dengan kalimat: 
        "Ente kadang-kadang ente... Ana ini asisten virtual khusus persoalan agama, bukan pengamat [sebutkan topik yang ditanyakan]. Tanya seputar ibadah aja barakallahu fiik."
     2. Tetap interaktif dan jangan terlalu kaku. Jika pertanyaan relevan, berikan penjelasan yang mendalam.
-    3. Jika pertanyaan menyangkut Al-Qur'an, sertakan teks Arab dan terjemahan. Gunakan tag [QURAN:Surah:Ayat] tepat setelah teks Arab!
+    3. Jika pertanyaan menyangkut Al-Qur'an, sertakan teks Arab dan terjemahan jika memungkinkan. Gunakan tag [QURAN:Surah:Ayat] untuk menandai referensi Al-QURAN.
 
     === ATURAN FORMATTING AL-QURAN ===
     1. Tag [QURAN:Surah:Ayat] HARUS MENEMPEL DI BARIS YANG SAMA dengan Teks Arab!
     2. Contoh: (Teks Arab) [QURAN:1:1]`;
 
-    // Menggunakan kunci yang di-hardcode
-    const genAI = new GoogleGenerativeAI(hardcodedKey);
-    const MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'];
+    const genAI = new GoogleGenerativeAI(checkKey);
+    // GANTI: Model harus valid (gemini-2.0-flash sangat stabil saat ini)
+    const MODELS = ['gemini-2.5-flash-lite','gemini-2.5-flash','gemini-2.0-flash'];
 
     for (const modelName of MODELS) {
         try {
@@ -42,9 +50,10 @@ module.exports = async (req, res) => {
                 systemInstruction: systemInstruction 
             });
 
+            const trimmedHistory = history.length > 10 ? history.slice(-10) : history;
             const chat = model.startChat({
-                history: history.slice(-10),
-                generationConfig: { maxOutputTokens: 2000, temperature: 0.7 }
+                history: trimmedHistory,
+                generationConfig: { maxOutputTokens: 2000 }
             });
 
             const result = await chat.sendMessage(message);
@@ -53,13 +62,14 @@ module.exports = async (req, res) => {
 
         } catch (error) {
             console.error(`Error pada model ${modelName}:`, error.message);
+            // Jika error karena quota (429), lanjut ke model berikutnya
             if (error.status === 429 || error.message.includes("429")) continue; 
             
-            return res.status(200).json({ 
+            return res.status(500).json({ 
                 status: "error", 
-                reply: "Afwan Akhi, sepertinya ada kendala teknis. Detail: " + error.message 
+                reply: "Afwan, sistem sedang lelah. Detail: " + error.message 
             });
         }
     }
-    res.status(200).json({ status: "error", reply: "Afwan Akhi, kuota API ini juga sedang limit. Coba lagi nanti ya." });
+    res.status(200).json({ status: "error", reply: "Afwan Akhi, limit harian habis. Coba lagi nanti." });
 };

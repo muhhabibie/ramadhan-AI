@@ -6,6 +6,7 @@
 
 ##  Tangkapan Layar UI (Screenshots)
 
+<img width="2559" height="1463" alt="Screenshot 2026-02-22 164818" src="https://github.com/user-attachments/assets/96d6f8c8-49d5-425b-ae62-4a29ace5b98d" />
 
 ##  Fitur Utama
 

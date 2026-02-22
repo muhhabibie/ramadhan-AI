@@ -91,21 +91,74 @@ async function playRealQuranAudio(surah, ayah, btnElement) {
     window.speechSynthesis.cancel();
     
     const originalText = btnElement.innerHTML;
-    btnElement.innerHTML = "Memuat...";
+    const originalDisabled = btnElement.disabled;
+    btnElement.innerHTML = "⏳ Memuat...";
+    btnElement.disabled = true;
     
     try {
         const res = await fetch(`https://api.alquran.cloud/v1/ayah/${surah}:${ayah}/ar.alafasy`);
         const json = await res.json();
+        console.log("API Response:", json);
         
-        if(json.code === 200) {
-            quranAudioPlayer = new Audio(json.data.audio);
-            quranAudioPlayer.play();
-            btnElement.innerHTML = "🔊 Sedang Mengaji...";
-            quranAudioPlayer.onended = () => btnElement.innerHTML = originalText;
+        if(json.code === 200 && json.data.audio) {
+            quranAudioPlayer = new Audio();
+            quranAudioPlayer.crossOrigin = "anonymous";
+            quranAudioPlayer.preload = "auto";
+            
+            // Handle buat sukses loading audio
+            quranAudioPlayer.addEventListener('canplay', () => {
+                console.log("Audio siap diputar");
+                btnElement.innerHTML = "🔊 Sedang Mengaji...";
+            }, { once: true });
+            
+            // Handle error saat loading atau playing
+            quranAudioPlayer.addEventListener('error', (e) => {
+                console.error("Audio Error:", e, e.target.error);
+                btnElement.innerHTML = originalText;
+                btnElement.disabled = originalDisabled;
+                alert("⚠️ Tidak bisa memutar audio. Cek koneksi internet Antum.");
+            });
+            
+            // Handle selesai playback
+            quranAudioPlayer.addEventListener('ended', () => {
+                btnElement.innerHTML = originalText;
+                btnElement.disabled = originalDisabled;
+            });
+            
+            // Set source dan coba play
+            quranAudioPlayer.src = json.data.audio;
+            quranAudioPlayer.load();
+            console.log("Audio loading dari:", json.data.audio);
+            
+            // Gunakan Promise untuk handle autoplay policy di mobile
+            const playPromise = quranAudioPlayer.play();
+            if (playPromise !== undefined) {
+                playPromise
+                    .then(() => {
+                        console.log("Audio playback started successfully");
+                    })
+                    .catch(error => {
+                        console.error("Play Error:", error.name, error.message);
+                        btnElement.innerHTML = originalText;
+                        btnElement.disabled = originalDisabled;
+                        
+                        if (error.name === 'NotAllowedError') {
+                            alert("⚠️ Browser blokirnya autoplay. Ketuk button lagi ya!");
+                        } else {
+                            alert("⚠️ Tidak bisa memutar audio: " + error.message);
+                        }
+                    });
+            }
+        } else {
+            btnElement.innerHTML = originalText;
+            btnElement.disabled = originalDisabled;
+            alert("Audio tidak tersedia untuk ayat ini.");
         }
     } catch (e) { 
+        console.error("Fetch Error:", e);
         btnElement.innerHTML = originalText;
-        alert("Gagal memutar murottal.");
+        btnElement.disabled = originalDisabled;
+        alert("Gagal memutar murottal: " + e.message);
     }
 }
 

@@ -1,6 +1,6 @@
 /**
  * @fileoverview Frontend logic untuk Ramadhan AI.
- * Fitur: Efek mengetik, Pembeda audio Quran vs Hadits, & Geolocation.
+ * Fitur: Efek mengetik, Pembeda audio Quran vs Hadits, Geolocation, Stop & Retry.
  */
 
 // ==========================================
@@ -11,31 +11,39 @@ let sessionId = localStorage.getItem("current_session") || "session_" + Date.now
 let currentAbortController = null;
 let currentCity = localStorage.getItem("user_city") || "Malang";
 let quranAudioPlayer = null;
+let cancelTyping = false; // Flag untuk menghentikan efek ngetik
 
 // ==========================================
 // 2. CORE UTILS (Markdown & Audio)
 // ==========================================
 
 function formatMarkdown(text) {
-    // Regex fleksibel untuk menangkap [QURAN:1:1]
-    const arabicRegex = /([\u0600-\u06FF][\u0600-\u06FF\s\.,،؛؟()'\-]*[\u0600-\u06FF])\s*(?:\[(?:QURAN:)?\s*(\d+)\s*:\s*(\d+)\s*\])?/gi;
+    // 1. Cari tag [QURAN:x:y] di SELURUH pesan (bukan cuma yang nempel di teks Arab)
+    let quranMatch = text.match(/\[QURAN:\s*(\d+)\s*:\s*(\d+)\s*\]/i);
+    let gSurah = quranMatch ? quranMatch[1] : null;
+    let gAyah = quranMatch ? quranMatch[2] : null;
 
-    let html = text;
+    // 2. Hilangkan tulisan tag [QURAN:x:y] dari UI agar bersih
+    let html = text.replace(/\[QURAN:\s*\d+\s*:\s*\d+\s*\]/gi, '');
+
+    // 3. Regex untuk mendeteksi blok teks Arab
+    const arabicRegex = /([\u0600-\u06FF][\u0600-\u06FF\s\.,،؛؟()'\-]*[\u0600-\u06FF])/gi;
+
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/^(#{1,6})\s+(.*$)/gim, '<h3 class="chat-heading">$2</h3>');
     html = html.replace(/^\* (.*$)/gim, '<div class="list-item">• $1</div>');
     
-    html = html.replace(arabicRegex, function(match, arabicText, surah, ayah) {
-        if (surah && ayah) {
-            // JIKA AL-QURAN: Tombol Murottal Asli
+    html = html.replace(arabicRegex, function(match, arabicText) {
+        // Jika di dalam pesan bot ini terdapat tag QURAN, otomatis jadikan Murottal Asli
+        if (gSurah && gAyah) {
             return `
             <div class="arabic-container">
                 <div class="arabic-text" dir="rtl">${arabicText}</div>
-                <button class="play-audio-btn" onclick="playRealQuranAudio(${surah}, ${ayah}, this)">▶ Putar Murottal Asli</button>
+                <button class="play-audio-btn" onclick="playRealQuranAudio(${gSurah}, ${gAyah}, this)">▶ Putar Murottal Asli</button>
                 <small class="audio-notice">✨ Suara asli Qari tersedia untuk ayat Al-Quran</small>
             </div>`;
         } else {
-            // JIKA DOA/HADITS: Gunakan AI Voice
+            // Jika bot tidak memberikan tag QURAN, berarti itu Hadits/Doa (Suara AI)
             const encodedText = encodeURIComponent(arabicText);
             return `
             <div class="arabic-container">
@@ -58,8 +66,12 @@ function typeMessage(element, text) {
         let html = formatMarkdown(text);
         let isTag = false;
         element.innerHTML = "";
+        cancelTyping = false; // Reset variabel setiap kali mulai ngetik
         
         function type() {
+            // JIKA TOMBOL STOP DITEKAN, BERHENTIKAN LOOPING
+            if (cancelTyping) { resolve(); return; }
+            
             if (i < html.length) {
                 let char = html.charAt(i);
                 if (char === '<') isTag = true;
@@ -102,25 +114,20 @@ async function playRealQuranAudio(surah, ayah, btnElement) {
         
         if(json.code === 200 && json.data.audio) {
             quranAudioPlayer = new Audio();
-            
-            // ❌ HAPUS ATAU KOMENTARI BARIS INI
-            // quranAudioPlayer.crossOrigin = "anonymous"; 
-            
+            // CROSSORIGIN DIHAPUS AGAR TIDAK DIBLOKIR BROWSER
             quranAudioPlayer.preload = "auto";
             
-            // ✅ TAMBAHKAN INI UNTUK MENCEGAH MIXED CONTENT (HTTP -> HTTPS)
+            // PAKSA AUDIO MENGGUNAKAN HTTPS UNTUK MENCEGAH MIXED CONTENT DI VERCEL
             let audioUrl = json.data.audio;
             if (audioUrl.startsWith('http://')) {
                 audioUrl = audioUrl.replace('http://', 'https://');
             }
             
-            // Handle buat sukses loading audio
             quranAudioPlayer.addEventListener('canplay', () => {
                 console.log("Audio siap diputar");
                 btnElement.innerHTML = "🔊 Sedang Mengaji...";
             }, { once: true });
             
-            // Handle error saat loading atau playing
             quranAudioPlayer.addEventListener('error', (e) => {
                 console.error("Audio Error:", e, e.target.error);
                 btnElement.innerHTML = originalText;
@@ -128,18 +135,16 @@ async function playRealQuranAudio(surah, ayah, btnElement) {
                 alert("⚠️ Tidak bisa memutar audio. Cek koneksi internet Antum.");
             });
             
-            // Handle selesai playback
             quranAudioPlayer.addEventListener('ended', () => {
                 btnElement.innerHTML = originalText;
                 btnElement.disabled = originalDisabled;
             });
             
-            // Set source menggunakan audioUrl yang sudah dipastikan HTTPS
-            quranAudioPlayer.src = audioUrl; 
+            // Set source ke HTTPS URL
+            quranAudioPlayer.src = audioUrl;
             quranAudioPlayer.load();
             console.log("Audio loading dari:", audioUrl);
             
-            // Gunakan Promise untuk handle autoplay policy di mobile
             const playPromise = quranAudioPlayer.play();
             if (playPromise !== undefined) {
                 playPromise
@@ -179,7 +184,7 @@ function playArabicAudio(text) {
     if (quranAudioPlayer) quranAudioPlayer.pause();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'ar-SA';
-    utterance.rate = 0.85; // Dipelankan sedikit agar jelas
+    utterance.rate = 0.85; 
     window.speechSynthesis.speak(utterance);
 }
 
@@ -296,14 +301,26 @@ async function sendMessage() {
     await fetchBotResponse(message);
 }
 
+// ==========================================
+// 5. FETCH RESPONSE & ACTIONS (STOP/RETRY)
+// ==========================================
+
 async function fetchBotResponse(message) {
     const history = document.getElementById("chat-history");
     const wrapper = document.createElement("div");
     wrapper.className = "bot-message-wrapper";
+    
     const msgDiv = document.createElement("div");
     msgDiv.className = "message bot-message";
     msgDiv.innerHTML = "Berpikir...";
+    
+    // CONTAINER TOMBOL ACTION (Stop/Retry)
+    const actionsDiv = document.createElement("div");
+    actionsDiv.className = "message-actions";
+    actionsDiv.innerHTML = `<button class="action-btn stop-btn" onclick="stopBot()">🛑 Stop</button>`;
+    
     wrapper.appendChild(msgDiv);
+    wrapper.appendChild(actionsDiv);
     history.appendChild(wrapper);
     history.scrollTop = history.scrollHeight;
 
@@ -313,24 +330,63 @@ async function fetchBotResponse(message) {
         parts: [{ text: m.text }]
     }));
 
+    currentAbortController = new AbortController();
+
     try {
         const response = await fetch("/api/chat", {
             method: "POST", 
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message, history: historyPayload })
+            body: JSON.stringify({ message, history: historyPayload }),
+            signal: currentAbortController.signal
         });
+        
         const data = await response.json();
+        
         if (data.status === "success") {
-            // AKTIFKAN KEMBALI EFEK MENGETIK
             await typeMessage(msgDiv, data.reply);
-            saveMessageToSession("bot", data.reply);
+            
+            // Hanya save ke history jika tidak di-stop paksa
+            if (!cancelTyping) saveMessageToSession("bot", data.reply);
+            
+            // Ubah tombol Stop menjadi Retry setelah selesai
+            actionsDiv.innerHTML = `<button class="action-btn" onclick="retryMessage('${message.replace(/'/g, "\\'")}', this)">🔄 Retry</button>`;
         } else {
             msgDiv.innerHTML = data.reply;
+            actionsDiv.innerHTML = `<button class="action-btn" onclick="retryMessage('${message.replace(/'/g, "\\'")}', this)">🔄 Retry</button>`;
         }
     } catch (e) {
-        msgDiv.innerHTML = "Waduh, gagal memuat jawaban.";
+        if (e.name === 'AbortError') {
+            msgDiv.innerHTML += "<br><br><em>[Generate dihentikan...]</em>";
+        } else {
+            msgDiv.innerHTML = "Waduh, koneksi terputus. Coba lagi ya.";
+        }
+        actionsDiv.innerHTML = `<button class="action-btn" onclick="retryMessage('${message.replace(/'/g, "\\'")}', this)">🔄 Retry</button>`;
+    } finally {
+        currentAbortController = null;
     }
 }
+
+// FUNGSI UNTUK TOMBOL STOP
+function stopBot() {
+    if (currentAbortController) {
+        currentAbortController.abort(); // Batalkan request internet
+    }
+    cancelTyping = true; // Hentikan efek mengetik
+}
+
+// FUNGSI UNTUK TOMBOL RETRY
+function retryMessage(originalMessage, btnElement) {
+    // 1. Hapus bubble chat bot yang gagal/dihentikan ini
+    const wrapper = btnElement.closest('.bot-message-wrapper');
+    if(wrapper) wrapper.remove();
+    
+    // 2. Tembak ulang requestnya dengan pesan yang sama
+    fetchBotResponse(originalMessage);
+}
+
+// ==========================================
+// 6. UI TOGGLES & LISTENERS
+// ==========================================
 
 function toggleSidebar() {
     document.getElementById("sidebar").classList.toggle("active");

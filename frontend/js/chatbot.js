@@ -102,8 +102,17 @@ async function playRealQuranAudio(surah, ayah, btnElement) {
         
         if(json.code === 200 && json.data.audio) {
             quranAudioPlayer = new Audio();
-            quranAudioPlayer.crossOrigin = "anonymous";
+            
+            // ❌ HAPUS ATAU KOMENTARI BARIS INI
+            // quranAudioPlayer.crossOrigin = "anonymous"; 
+            
             quranAudioPlayer.preload = "auto";
+            
+            // ✅ TAMBAHKAN INI UNTUK MENCEGAH MIXED CONTENT (HTTP -> HTTPS)
+            let audioUrl = json.data.audio;
+            if (audioUrl.startsWith('http://')) {
+                audioUrl = audioUrl.replace('http://', 'https://');
+            }
             
             // Handle buat sukses loading audio
             quranAudioPlayer.addEventListener('canplay', () => {
@@ -125,10 +134,10 @@ async function playRealQuranAudio(surah, ayah, btnElement) {
                 btnElement.disabled = originalDisabled;
             });
             
-            // Set source dan coba play
-            quranAudioPlayer.src = json.data.audio;
+            // Set source menggunakan audioUrl yang sudah dipastikan HTTPS
+            quranAudioPlayer.src = audioUrl; 
             quranAudioPlayer.load();
-            console.log("Audio loading dari:", json.data.audio);
+            console.log("Audio loading dari:", audioUrl);
             
             // Gunakan Promise untuk handle autoplay policy di mobile
             const playPromise = quranAudioPlayer.play();
@@ -143,7 +152,7 @@ async function playRealQuranAudio(surah, ayah, btnElement) {
                         btnElement.disabled = originalDisabled;
                         
                         if (error.name === 'NotAllowedError') {
-                            alert("⚠️ Browser blokirnya autoplay. Ketuk button lagi ya!");
+                            alert("⚠️ Browser memblokir autoplay. Ketuk button lagi ya!");
                         } else {
                             alert("⚠️ Tidak bisa memutar audio: " + error.message);
                         }

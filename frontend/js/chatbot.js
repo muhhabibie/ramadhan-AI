@@ -18,32 +18,27 @@ let cancelTyping = false; // Flag untuk menghentikan efek ngetik
 // ==========================================
 
 function formatMarkdown(text) {
-    // 1. Cari tag [QURAN:x:y] di SELURUH pesan (bukan cuma yang nempel di teks Arab)
-    let quranMatch = text.match(/\[QURAN:\s*(\d+)\s*:\s*(\d+)\s*\]/i);
-    let gSurah = quranMatch ? quranMatch[1] : null;
-    let gAyah = quranMatch ? quranMatch[2] : null;
+    let html = text;
 
-    // 2. Hilangkan tulisan tag [QURAN:x:y] dari UI agar bersih
-    let html = text.replace(/\[QURAN:\s*\d+\s*:\s*\d+\s*\]/gi, '');
-
-    // 3. Regex untuk mendeteksi blok teks Arab
-    const arabicRegex = /([\u0600-\u06FF][\u0600-\u06FF\s\.,،؛؟()'\-]*[\u0600-\u06FF])/gi;
-
+    // 1. Format basic markdown (Bold, Heading, List)
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/^(#{1,6})\s+(.*$)/gim, '<h3 class="chat-heading">$2</h3>');
     html = html.replace(/^\* (.*$)/gim, '<div class="list-item">• $1</div>');
     
-    html = html.replace(arabicRegex, function(match, arabicText) {
-        // Jika di dalam pesan bot ini terdapat tag QURAN, otomatis jadikan Murottal Asli
-        if (gSurah && gAyah) {
+    // 2. Regex Baru: Tangkap teks Arab, dan TANGKAP JUGA tag [QURAN:x:y] yang menempel setelahnya
+    const arabicWithTagRegex = /([\u0600-\u06FF][\u0600-\u06FF\s\.,،؛؟()'\-]*[\u0600-\u06FF])(?:\s*\[QURAN:\s*(\d+)\s*:\s*(\d+)\s*\])?/gi;
+
+    html = html.replace(arabicWithTagRegex, function(match, arabicText, surah, ayah) {
+        // Jika regex berhasil menangkap angka surah dan ayat di sebelah teks Arab spesifik ini
+        if (surah && ayah) {
             return `
             <div class="arabic-container">
                 <div class="arabic-text" dir="rtl">${arabicText}</div>
-                <button class="play-audio-btn" onclick="playRealQuranAudio(${gSurah}, ${gAyah}, this)">▶ Putar Murottal Asli</button>
+                <button class="play-audio-btn" onclick="playRealQuranAudio(${surah}, ${ayah}, this)">▶ Putar Murottal Asli</button>
                 <small class="audio-notice">✨ Suara asli Qari tersedia untuk ayat Al-Quran</small>
             </div>`;
         } else {
-            // Jika bot tidak memberikan tag QURAN, berarti itu Hadits/Doa (Suara AI)
+            // Jika tidak ada tag QURAN, jadikan Suara AI
             const encodedText = encodeURIComponent(arabicText);
             return `
             <div class="arabic-container">
@@ -54,9 +49,11 @@ function formatMarkdown(text) {
         }
     });
     
+    // 3. Bersihkan sisa tag QURAN agar UI tetap rapi
+    html = html.replace(/\[QURAN:\s*\d+\s*:\s*\d+\s*\]/gi, '');
+
     return html.replace(/\n/g, '<br>');
 }
-
 /**
  * Efek Mengetik (Typing Effect)
  */
